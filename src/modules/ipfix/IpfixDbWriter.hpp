@@ -27,6 +27,7 @@
 #define IPFIXDBWRITER_H
 
 #include "IpfixDbCommon.hpp"
+#include "IpfixDbCommonCfg.hpp"
 #include "IpfixRecordDestination.h"
 #include "common/ipfixlolib/ipfix.h"
 #include "common/ipfixlolib/ipfixlolib.h"
@@ -48,22 +49,10 @@ class IpfixDbWriter
 		IpfixDbWriter(const string& hostname, const string& dbname,
 				const string& username, const string& password,
 				unsigned port, uint32_t observationDomainId, unsigned maxStatements,
-				const vector<string>& columns);
+				vector<IpfixDbColumn *>& columns);
 		~IpfixDbWriter();
 
 		void onDataRecord(IpfixDataRecord* record);
-
-		/**
-		 * Struct to identify the relationship between columns names and 
-		 * IPFIX_TYPEID, column type and default value
-		 */
-		struct Column {
-			const char* columnName; 	/** column name */
-			const char* columnType;		/** column data type in database */
-			uint64_t defaultValue;       	/** default value */
-			InformationElement::IeId ipfixId; /** IPFIX_TYPEID */
-			InformationElement::IeEnterpriseNumber enterprise; /** enterprise number */
-		};
 
 	private:
 		static const unsigned MAX_EXPORTER = 10;    // maximum numbers of cached exporters
@@ -97,7 +86,7 @@ class IpfixDbWriter
 		int numberOfInserts;					// number of inserts in statement
 		int maxInserts;						// maximum number of inserts per statement
 
-		vector<Column> tableColumns;			// table columns
+		vector<IpfixDbColumn *> &tableColumns;			// table columns
 		string tableColumnsString;     			// table columns as string for INSERT statements
 		string tableColumnsCreateString;  			// table columns as string for CREATE statements
 
@@ -118,9 +107,10 @@ class IpfixDbWriter
 				TemplateInfo& dataTemplateInfo, uint16_t length, 
 				IpfixRecord::Data* data);
 
-
-		uint64_t getData(InformationElement::IeInfo type, IpfixRecord::Data* data);
 		bool equalExporter(const IpfixRecord::SourceID& a, const IpfixRecord::SourceID& b);
+
+		TemplateInfo::FieldInfo *getField(TemplateInfo &templateInfo, IpfixRecord::Data *&data, InformationElement::IeId ieId,
+										  InformationElement::IeEnterpriseNumber ieEnterprise) const;
 };
 
 

@@ -28,41 +28,8 @@
 #include <iomanip>
 #include <stdlib.h>
 #include "IpfixDbWriter.hpp"
+#include "IpfixDbWriterCfg.h"
 #include "common/msg.h"
-
-/**
- *	struct to identify column names with IPFIX_TYPEID an the dataType to store in database
- *	ExporterID is no IPFIX_TYPEID, its user specified
- *      Attention: order of entries is important!
- */
-IpfixDbWriter::Column identify [] = {
-	{CN_dstIP, 		"INTEGER(10) UNSIGNED", 	0, IPFIX_TYPEID_destinationIPv4Address, 0},
-	{CN_srcIP, 		"INTEGER(10) UNSIGNED", 	0, IPFIX_TYPEID_sourceIPv4Address, 0},
-	{CN_srcPort, 		"SMALLINT(5) UNSIGNED", 	0, IPFIX_TYPEID_sourceTransportPort, 0},
-	{CN_dstPort, 		"SMALLINT(5) UNSIGNED", 	0, IPFIX_TYPEID_destinationTransportPort, 0},
-	{CN_proto, 		"TINYINT(3) UNSIGNED", 		0, IPFIX_TYPEID_protocolIdentifier, 0 },
-	{CN_dstTos, 		"TINYINT(3) UNSIGNED", 		0, IPFIX_TYPEID_classOfServiceIPv4, 0},
-	{CN_bytes, 		"BIGINT(20) UNSIGNED", 		0, IPFIX_TYPEID_octetDeltaCount, 0},
-	{CN_pkts, 		"BIGINT(20) UNSIGNED", 		0, IPFIX_TYPEID_packetDeltaCount, 0},
-	{CN_firstSwitched, 	"INTEGER(10) UNSIGNED", 	0, IPFIX_TYPEID_flowStartSeconds, 0}, // default value is invalid/not used for this ent
-	{CN_lastSwitched, 	"INTEGER(10) UNSIGNED", 	0, IPFIX_TYPEID_flowEndSeconds, 0}, // default value is invalid/not used for this entry
-	{CN_firstSwitchedMillis, "SMALLINT(5) UNSIGNED", 	0, IPFIX_TYPEID_flowStartMilliSeconds, 0},
-	{CN_lastSwitchedMillis, "SMALLINT(5) UNSIGNED", 	0, IPFIX_TYPEID_flowEndMilliSeconds, 0},
-	{CN_tcpControlBits,  	"SMALLINT(5) UNSIGNED", 	0, IPFIX_TYPEID_tcpControlBits, 0},
-	//TODO: use enterprise number for the following extended types (Gerhard, 12/2009)
-	{CN_revbytes, 		"BIGINT(20) UNSIGNED", 		0, IPFIX_TYPEID_octetDeltaCount, IPFIX_PEN_reverse},
-	{CN_revpkts, 		"BIGINT(20) UNSIGNED", 		0, IPFIX_TYPEID_packetDeltaCount, IPFIX_PEN_reverse},
-	{CN_revFirstSwitched, 	"INTEGER(10) UNSIGNED", 	0, IPFIX_TYPEID_flowStartSeconds, IPFIX_PEN_reverse}, // default value is invalid/not used for this entry
-	{CN_revLastSwitched, 	"INTEGER(10) UNSIGNED", 	0, IPFIX_TYPEID_flowEndSeconds, IPFIX_PEN_reverse}, // default value is invalid/not used for this entry
-	{CN_revFirstSwitchedMillis, "SMALLINT(5) UNSIGNED", 	0, IPFIX_TYPEID_flowStartMilliSeconds, IPFIX_PEN_reverse},
-	{CN_revLastSwitchedMillis, "SMALLINT(5) UNSIGNED", 	0, IPFIX_TYPEID_flowEndMilliSeconds, IPFIX_PEN_reverse},
-	{CN_revTcpControlBits,  "SMALLINT(5) UNSIGNED", 	0, IPFIX_TYPEID_tcpControlBits, IPFIX_PEN_reverse},
-	{CN_maxPacketGap,  	"BIGINT(20) UNSIGNED", 		0, IPFIX_ETYPEID_maxPacketGap, IPFIX_PEN_vermont|IPFIX_PEN_reverse},
-	{CN_exporterID, 	"SMALLINT(5) UNSIGNED", 	0, EXPORTERID, 0},
-	{0} // last entry must be 0
-};
-
-
 
 /**
  * Compare two source IDs and check if exporter is the same (i.e., same IP address and observationDomainId
@@ -139,6 +106,12 @@ int IpfixDbWriter::connectToDB()
 
 	dbError = false;
 
+	for (vector<IpfixDbColumn *>::iterator it = tableColumns.begin(); it < tableColumns.end(); it++) {
+		IpfixDbColumn *col = *it;
+		IpfixDbMySQLSerializer *serializer = (IpfixDbMySQLSerializer *) col->serializer();
+
+		serializer->setConnection(conn);
+	}
 	return 0;
 }
 
@@ -203,6 +176,27 @@ void IpfixDbWriter::processDataDataRecord(const IpfixRecord::SourceID& sourceID,
 }
 
 
+TemplateInfo::FieldInfo *IpfixDbWriter::getField(TemplateInfo &templateInfo,
+												 IpfixRecord::Data *&data,
+												 InformationElement::IeId ieId,
+												 InformationElement::IeEnterpriseNumber ieEnterprise) const {
+	TemplateInfo::FieldInfo *fieldInfo = templateInfo.getFieldInfo(ieId, ieEnterprise);
+
+	if (fieldInfo) {
+		data += fieldInfo->offset;
+
+		return fieldInfo;
+	}
+
+	fieldInfo = templateInfo.getDataInfo(ieId, ieEnterprise);
+
+	if (fieldInfo) {
+		data = templateInfo.data + fieldInfo->offset;
+	}
+
+	return fieldInfo;
+}
+
 /**
  *	loop over table columns and template to get the IPFIX values in correct order to store in database
  *	The result is written into row, the firstSwitched time is returned in flowstartsec
@@ -210,10 +204,8 @@ void IpfixDbWriter::processDataDataRecord(const IpfixRecord::SourceID& sourceID,
 string& IpfixDbWriter::getInsertString(string& row, time_t& flowstartsec, const IpfixRecord::SourceID& sourceID,
 		TemplateInfo& dataTemplateInfo,uint16_t length, IpfixRecord::Data* data)
 {
-	uint64_t intdata = 0;
-	uint64_t intdata2 = 0;
-	uint32_t k;
-	bool notfound, notfound2;
+	string value;
+	bool notfound;
 	bool first = true;
 	ostringstream rowStream(row);
 
@@ -222,163 +214,128 @@ string& IpfixDbWriter::getInsertString(string& row, time_t& flowstartsec, const 
 
 	/**loop over the columname and loop over the IPFIX_TYPEID of the record
 	 to get the corresponding data to store and make insert statement*/
-	for(vector<Column>::iterator col = tableColumns.begin(); col != tableColumns.end(); col++) {
-		if (col->ipfixId == EXPORTERID) {
+	for(vector<IpfixDbColumn *>::iterator colIter = tableColumns.begin(); colIter != tableColumns.end(); colIter++) {
+		IpfixDbColumn *col = *colIter;
+
+		if (col->ieId() == EXPORTERID) {
 			// if this is the same source ID as last time, we get the exporter id from currentExporter
+			ostringstream str;
+
 			if ((currentExporter != NULL) && equalExporter(sourceID, currentExporter->sourceID)) {
 				DPRINTF("Exporter is same as last time (ODID=%d, id=%d)", sourceID.observationDomainId, currentExporter->id);
-				intdata = (uint64_t)currentExporter->id;
+
+				str << (uint64_t) currentExporter->id;
 			} else {
 			// lookup exporter buffer to get exporterID from sourcID and expIp
-				intdata = (uint64_t)getExporterID(sourceID);
+				str << (uint64_t) getExporterID(sourceID);
 			}
+
+			value = str.str();
 		} else {
 			notfound = true;
-			// try to gather data required for the field
-			if(dataTemplateInfo.fieldCount > 0) {
-				// look inside the ipfix record
-				for(k=0; k < dataTemplateInfo.fieldCount; k++) {
-					if(dataTemplateInfo.fieldInfo[k].type.enterprise ==  col->enterprise && dataTemplateInfo.fieldInfo[k].type.id == col->ipfixId) {
-						notfound = false;
-						intdata = getData(dataTemplateInfo.fieldInfo[k].type,(data+dataTemplateInfo.fieldInfo[k].offset));
-						DPRINTF("IpfixDbWriter::getData: really saw ipfix id %d in packet with intdata %llX, type %d, length %d and offset %X", col->ipfixId, intdata, dataTemplateInfo.fieldInfo[k].type.id, dataTemplateInfo.fieldInfo[k].type.length, dataTemplateInfo.fieldInfo[k].offset);
-						break;
-					}
-				}
+
+			IpfixRecord::Data *startData = data;
+			TemplateInfo::FieldInfo *fieldInfo = getField(dataTemplateInfo, startData, col->ieId(), col->ieEnterpriseId());
+
+			if (fieldInfo) {
+				notfound = false;
+				value = col->serializer()->serializeValue(startData, fieldInfo);
 			}
-			if( dataTemplateInfo.dataCount > 0 && notfound) {
-				// look in static data fields of template for data
-				for(k=0; k < dataTemplateInfo.dataCount; k++) {
-					if(dataTemplateInfo.fieldInfo[k].type.enterprise == col->enterprise && dataTemplateInfo.dataInfo[k].type.id == col->ipfixId) {
-						notfound = false;
-						intdata = getData(dataTemplateInfo.dataInfo[k].type,(dataTemplateInfo.data+dataTemplateInfo.dataInfo[k].offset));
-						break;
-					}
-				}
-			}
+
 			if(notfound) {
-				notfound2 = true;
 				// for some Ids, we have an alternative
-				if(col->enterprise == 0) {
-					switch (col->ipfixId) {
+				if(col->ieEnterpriseId() == 0) {
+					switch (col->ieId()) {
 						case IPFIX_TYPEID_flowStartSeconds:
-							if(dataTemplateInfo.fieldCount > 0) {
-								for(k=0; k < dataTemplateInfo.fieldCount; k++) {
-									// look for alternative (flowStartMilliSeconds/1000)
-									if(dataTemplateInfo.fieldInfo[k].type.id == IPFIX_TYPEID_flowStartMilliSeconds) {
-										intdata = getData(dataTemplateInfo.fieldInfo[k].type,(data+dataTemplateInfo.fieldInfo[k].offset)) / 1000;
-										notfound = false;
-										break;
-									}
-									// if no flow start time is available, maybe this is is from a netflow from Cisco
-									// then - as a last alternative - use flowStartSysUpTime as flow start time
-									if(dataTemplateInfo.fieldInfo[k].type.id == IPFIX_TYPEID_flowStartSysUpTime) {
-										intdata2 = getData(dataTemplateInfo.fieldInfo[k].type,(data+dataTemplateInfo.fieldInfo[k].offset));
-										notfound2 = false;
-									}
-								}
-								if(notfound && !notfound2) {
-									intdata = intdata2;
-									notfound = false;
-								}
-							}
-							break;
-						case IPFIX_TYPEID_flowEndSeconds:
-							if(dataTemplateInfo.fieldCount > 0) {
-								for(k=0; k < dataTemplateInfo.fieldCount; k++) {
-									// look for alternative (flowEndMilliSeconds/1000)
-									if(dataTemplateInfo.fieldInfo[k].type.id == IPFIX_TYPEID_flowEndMilliSeconds) {
-										intdata = getData(dataTemplateInfo.fieldInfo[k].type,(data+dataTemplateInfo.fieldInfo[k].offset)) / 1000;
-										notfound = false;
-										break;
-									}
-									// if no flow end time is available, maybe this is is from a netflow from Cisco
-									// then use flowEndSysUpTime as flow start time
-									if(dataTemplateInfo.fieldInfo[k].type.id == IPFIX_TYPEID_flowEndSysUpTime) {
-										intdata2 = getData(dataTemplateInfo.fieldInfo[k].type,(data+dataTemplateInfo.fieldInfo[k].offset));
-										notfound2 = false;
-									}
-								}
-								if(notfound && !notfound2) {
-									intdata = intdata2;
-									notfound = false;
-								}
-							}
-							break;
-					}
-				} else if (col->enterprise==IPFIX_PEN_reverse) {
-					switch (col->ipfixId) {
-						case IPFIX_TYPEID_flowStartSeconds:
-							// look for alternative (revFlowStartMilliSeconds/1000)
-							if(dataTemplateInfo.fieldCount > 0) {
-								for(k=0; k < dataTemplateInfo.fieldCount; k++) {
-									if(dataTemplateInfo.fieldInfo[k].type == InformationElement::IeInfo(IPFIX_TYPEID_flowStartMilliSeconds, IPFIX_PEN_reverse)) {
-										intdata = getData(dataTemplateInfo.fieldInfo[k].type,(data+dataTemplateInfo.fieldInfo[k].offset)) / 1000;
-										notfound = false;
-										break;
-									}
-								}
-							}
-							break;
-						case IPFIX_TYPEID_flowEndSeconds:
-							// look for alternative (revFlowEndMilliSeconds/1000)
-							if(dataTemplateInfo.fieldCount > 0) {
-								for(k=0; k < dataTemplateInfo.fieldCount; k++) {
-									if(dataTemplateInfo.fieldInfo[k].type == InformationElement::IeInfo(IPFIX_TYPEID_flowEndMilliSeconds, IPFIX_PEN_reverse)) {
-										intdata = getData(dataTemplateInfo.fieldInfo[k].type,(data+dataTemplateInfo.fieldInfo[k].offset)) / 1000;
-										notfound = false;
-										break;
-									}
-								}
-							}
-							break;
 
+						startData = data;
+						fieldInfo = getField(dataTemplateInfo, startData, IPFIX_TYPEID_flowStartMilliSeconds, 0);
+
+						if (fieldInfo) {
+							value = col->serializer()->serializeValue(startData, fieldInfo);
+							notfound = false;
+						} else {
+							startData = data;
+							fieldInfo = getField(dataTemplateInfo, startData, IPFIX_TYPEID_flowStartSysUpTime, 0);
+
+							if (fieldInfo) {
+								value = col->serializer()->serializeValue(startData, fieldInfo);
+								notfound = false;
+							}
+						}
+						break;
+
+						case IPFIX_TYPEID_flowEndSeconds:
+						startData = data;
+						fieldInfo = getField(dataTemplateInfo, startData, IPFIX_TYPEID_flowEndMilliSeconds, 0);
+
+						if (fieldInfo) {
+							value = col->serializer()->serializeValue(startData, fieldInfo);
+							notfound = false;
+						} else {
+							startData = data;
+							fieldInfo = getField(dataTemplateInfo, startData, IPFIX_TYPEID_flowEndSysUpTime, 0);
+
+							if (fieldInfo) {
+								value = col->serializer()->serializeValue(startData, fieldInfo);
+								notfound = false;
+							}
+						}
+
+						break;
+					}
+				} else if (col->ieEnterpriseId()==IPFIX_PEN_reverse) {
+					switch (col->ieId()) {
+					case IPFIX_TYPEID_flowStartSeconds:
+						startData = data;
+						fieldInfo = getField(dataTemplateInfo, startData, IPFIX_TYPEID_flowStartMilliSeconds, IPFIX_PEN_reverse);
+
+						if (fieldInfo) {
+							value = col->serializer()->serializeValue(startData, fieldInfo);
+							notfound = false;
+						}
+						break;
+					case IPFIX_TYPEID_flowEndSeconds:
+						startData = data;
+						fieldInfo = getField(dataTemplateInfo, startData, IPFIX_TYPEID_flowEndMilliSeconds, IPFIX_PEN_reverse);
+
+						if (fieldInfo) {
+							value = col->serializer()->serializeValue(startData, fieldInfo);
+							notfound = false;
+						}
+						break;
 					}
 				}
-				// if still not found, get default value
-				if(notfound)
-					intdata = col->defaultValue;
+
+				if (notfound && !col->defaultValue().empty())
+					value = col->defaultValue();
 			}
 
-			// we need extra treatment for timing related fields
-			if(col->enterprise == 0 ) {
-				switch (col->ipfixId) {
-					case IPFIX_TYPEID_flowStartSeconds:
-						// save time for table access
-						if (flowstartsec==0) flowstartsec = intdata;
-						break;
-
-					case IPFIX_TYPEID_flowEndSeconds:
-						break;
-
-					case IPFIX_TYPEID_flowStartMilliSeconds:
-						// if flowStartSeconds is not stored in one of the columns, but flowStartMilliSeconds is,
-						// then we use flowStartMilliSeconds for table access
-						// This is realized by storing this value only if flowStartSeconds has not yet been seen.
-						// A later appearing flowStartSeconds will override this value.
-						if (flowstartsec==0)
-							flowstartsec = intdata/1000;
-					case IPFIX_TYPEID_flowEndMilliSeconds:
-						// in the database the millisecond entry is counted from last second
-						intdata %= 1000;
-						break;
+			if(col->ieEnterpriseId() == 0 ) {
+				switch (col->ieId()) {
+				case IPFIX_TYPEID_flowStartSeconds:
+					// save time for table access
+					if (flowstartsec == 0) {
+						flowstartsec = strtoul(value.c_str(), NULL, 10);
+					}
+					break;
+				case IPFIX_TYPEID_flowStartMilliSeconds:
+					// if flowStartSeconds is not stored in one of the columns, but flowStartMilliSeconds is,
+					// then we use flowStartMilliSeconds for table access
+					// This is realized by storing this value only if flowStartSeconds has not yet been seen.
+					// A later appearing flowStartSeconds will override this value.
+					if (flowstartsec == 0) {
+						flowstartsec = strtoul(value.c_str(), NULL, 10) / 1000;
+					}
 				}
-			} else if (col->enterprise==IPFIX_PEN_reverse)
-				switch (col->ipfixId) {
-					case IPFIX_TYPEID_flowStartMilliSeconds:
-					case IPFIX_TYPEID_flowEndMilliSeconds:
-						// in the database the millisecond entry is counted from last second
-						intdata %= 1000;
-						break;
-				}
+			}
 		}
 
-		DPRINTF("saw ipfix id %d in packet with intdata %llX", col->ipfixId, intdata);
+		if(!first)
+			rowStream << ", ";
 
-		if(first)
-			rowStream << intdata;
-		else
-			rowStream << "," << intdata;
+		rowStream << value;
+
 		first = false;
 	}
 
@@ -390,6 +347,7 @@ string& IpfixDbWriter::getInsertString(string& row, time_t& flowstartsec, const 
 
 	row = rowStream.str();
 	DPRINTF("Insert row: %s", row.c_str());
+
 	return row;
 }
 
@@ -529,30 +487,6 @@ int IpfixDbWriter::getExporterID(const IpfixRecord::SourceID& sourceID)
 	return id;
 }
 
-/**
- *	Get data of the record is given by the IPFIX_TYPEID
- */
-uint64_t IpfixDbWriter::getData(InformationElement::IeInfo type, IpfixRecord::Data* data)
-{
-	switch (type.length) {
-		case 1:
-			return (*(uint8_t*)data);
-		case 2:
-			return ntohs(*(uint16_t*)data);
-		case 4:
-			return ntohl(*(uint32_t*)data);
-		case 5:	// may occur in the case if IP address + mask
-			return ntohl(*(uint32_t*)data);
-		case 8:
-			return ntohll(*(uint64_t*)data);
-		default:
-			printf("Uint with length %d unparseable", type.length);
-			return 0;
-	}
-}
-
-
-
 /***** Public Methods ****************************************************/
 
 /**
@@ -581,12 +515,10 @@ void IpfixDbWriter::onDataRecord(IpfixDataRecord* record)
 IpfixDbWriter::IpfixDbWriter(const string& hostname, const string& dbname,
 				const string& username, const string& password,
 				unsigned port, uint32_t observationDomainId, unsigned maxStatements,
-				const vector<string>& columns)
-	: currentExporter(NULL), numberOfInserts(0), maxInserts(maxStatements),
-	dbHost(hostname), dbName(dbname), dbUser(username), dbPassword(password), dbPort(port), conn(0)
+				vector<IpfixDbColumn *>& columns)
+	: currentExporter(NULL), numberOfInserts(0), maxInserts(maxStatements), tableColumns(columns),
+	  dbHost(hostname), dbName(dbname), dbUser(username), dbPassword(password), dbPort(port),  conn(0)
 {
-	int i;
-
 	// set default source id
 	srcId.exporterAddress.len = 0;
 	srcId.observationDomainId = observationDomainId;
@@ -604,27 +536,19 @@ IpfixDbWriter::IpfixDbWriter(const string& hostname, const string& dbname,
 
 	/* get columns */
 	bool first = true;
-	for(vector<string>::const_iterator col = columns.begin(); col != columns.end(); col++) {
-		i = 0;
-		while(identify[i].columnName != 0) {
-			if(col->compare(identify[i].columnName) == 0) {
-				Column c = identify[i];
-				tableColumns.push_back(c);
-				// update tableColumnsString
-				if(!first)
-					tableColumnsString.append(",");
-				tableColumnsString.append(identify[i].columnName);
-				// update tableColumnsCreateString
-				if(!first)
-					tableColumnsCreateString.append(", ");
-				tableColumnsCreateString.append(identify[i].columnName);
-				tableColumnsCreateString.append(" ");
-				tableColumnsCreateString.append(identify[i].columnType);
-				first = false;
-				break;
-			}
-			i++;
-		}
+	for(vector<IpfixDbColumn *>::const_iterator col = columns.begin(); col != columns.end(); col++) {
+		// update tableColumnsString
+		if(!first)
+			tableColumnsString.append(",");
+		tableColumnsString.append((*col)->name());
+		// update tableColumnsCreateString
+		if(!first)
+			tableColumnsCreateString.append(", ");
+		tableColumnsCreateString.append((*col)->name());
+		tableColumnsCreateString.append(" ");
+		tableColumnsCreateString.append((*col)->dbColumnTypeDefinition());
+
+		first = false;
 	}
 	msg(MSG_INFO, "IpfixDbWriter: columns are %s", tableColumnsString.c_str());
 
