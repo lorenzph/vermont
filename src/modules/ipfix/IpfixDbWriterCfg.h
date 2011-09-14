@@ -25,16 +25,38 @@
 
 #include <core/XMLElement.h>
 #include <core/Cfg.h>
+#include <string>
+#include <boost/regex.hpp>
 
 #include "modules/ipfix/IpfixDbWriter.hpp"
-
-#include <string>
+#include "IpfixDbCommonCfg.hpp"
 
 using namespace std;
 
+class IpfixDbMySQLSerializer : public IpfixDbSerializer {
+public:
+	IpfixDbMySQLSerializer(const IpfixDbColumn &type, SerializationType serializationType = Automatic);
+
+	void setConnection(MYSQL *connection) { this->connection = connection; }
+protected:
+	virtual SerializationType guessType(const IpfixRecord::Data *data, size_t dataLength) const;
+
+	virtual std::string escape(SerializationType type, const std::string &input);
+
+	uint64_t transformValue(uint64_t value, TemplateInfo::FieldInfo *fieldInfo);
+private:
+	bool integerType;
+	bool floatType;
+	bool unsignedType;
+
+	static const boost::regex integerRegex;
+	static const boost::regex floatRegex;
+
+	MYSQL *connection;
+};
 
 class IpfixDbWriterCfg
-	: public CfgHelper<IpfixDbWriter, IpfixDbWriterCfg>
+	: public IpfixDbCommonCfg, public CfgHelper<IpfixDbWriter, IpfixDbWriterCfg>
 {
 public:
 	friend class ConfigManager;
@@ -44,7 +66,7 @@ public:
 	
 	virtual IpfixDbWriter* createInstance();
 	virtual bool deriveFrom(IpfixDbWriterCfg* old);
-	
+
 protected:
 	
 	string hostname; /**< hostname of database host */
@@ -54,10 +76,14 @@ protected:
 	string password;	/**< password for login to database */
 	uint16_t bufferRecords;	/**< amount of records to buffer until they are written to database */
 	uint32_t observationDomainId;	/**< default observation domain id (overrides the one received in the records */
-	vector<string> colNames; /**< column names */
 
 	void readColumns(XMLElement* elem);
 	IpfixDbWriterCfg(XMLElement*);
+
+	IpfixDbSerializer *constructSerializer(const IpfixDbColumn &column) const;
+	const SimpleColumnEntry *simpleColumnEntries() const { return IpfixDbWriterCfg::SimpleColumnMap; }
+
+	static const IpfixDbCommonCfg::SimpleColumnEntry SimpleColumnMap[];
 };
 
 
