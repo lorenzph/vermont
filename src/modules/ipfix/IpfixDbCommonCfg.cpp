@@ -81,7 +81,7 @@ void IpfixDbCommonCfg::readComplexType(XMLElement *element) {
 				THROWEXCEPTION("Invalid information element id %d", ieId);
 			}
 
-			ieId = (uint16_t) ieId;
+			ieId = (uint16_t) ieId32;
 		} else if (e->matches("type")) {
 			dbColumnDefinition = e->getFirstText();
 		} else if (e->matches("name")) {
