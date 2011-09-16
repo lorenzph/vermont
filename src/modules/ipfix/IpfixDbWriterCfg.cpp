@@ -85,6 +85,8 @@ IpfixDbSerializer::SerializationType IpfixDbMySQLSerializer::guessType(const Ipf
 		default:
 			return unknownType;
 		}
+	} else if (m_type.ieId() >= IPFIX_TYPEID_basicList && m_type.ieId() <= IPFIX_TYPEID_subTemplateMultiList) {
+		return structuredData;
 	}
 
 	return unknownType;

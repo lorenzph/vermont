@@ -38,7 +38,8 @@ ADD_LIBRARY(common
 
 SUBDIRS(
 	anon
-	ipfixlolib	
+	ipfixlolib
+	jsoncpp
 )
 
 IF (WITH_DECOMPRESSION)
