@@ -21,6 +21,7 @@
 #if defined(DB_SUPPORT_ENABLED) || defined(PG_SUPPORT_ENABLED)
 
 #include <limits>
+#include <common/jsoncpp/json/json.h>
 
 #include "IpfixDbCommon.hpp"
 
@@ -70,7 +71,13 @@ std::string IpfixDbSerializer::serializeValue(const IpfixRecord::Data *data, Tem
 	case octetArray:
 	case string:
 		str << std::string((const char *) data, dataLength);
+		break;
+	case structuredData:
+		ok = true;
+		str << encodeStructuredData(data, fieldInfo);
 	}
+
+	DPRINTF("Serializing field with type %d to %s", type, str.str().c_str());
 
 	if (!ok) {
 		str.str("");
@@ -79,6 +86,43 @@ std::string IpfixDbSerializer::serializeValue(const IpfixRecord::Data *data, Tem
 	}
 
 	return escape(type, str.str());
+}
+
+string IpfixDbSerializer::encodeStructuredData(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const {
+	Json::Value root;
+
+	root["type"] = fieldInfo->type.id;
+
+	Json::Value rowArray;
+
+	for (uint16_t rowIndex = 0; rowIndex < fieldInfo->rowCount; rowIndex++) {
+		Json::Value row;
+		Json::Value fields;
+		TemplateInfo::StructuredDataRow *rowInfo = &fieldInfo->rows[rowIndex];
+
+		row["templateId"] = rowInfo->templateId;
+
+		for (uint16_t fieldIndex = 0; fieldIndex < rowInfo->fieldCount; fieldIndex++) {
+			Json::Value field;
+			TemplateInfo::FieldInfo *fieldInfo = &rowInfo->fields[fieldIndex];
+
+			field["id"] = fieldInfo->type.id;
+			field["enterpriseId"] = fieldInfo->type.enterprise;
+			field["value"] = Json::Value(std::string((const char *) data + fieldInfo->offset, fieldInfo->type.length));
+
+			fields.append(field);
+		}
+
+		row["fields"] = fields;
+
+		rowArray.append(row);
+	}
+
+	root["rows"] = rowArray;
+
+	Json::FastWriter writer;
+
+	return writer.write(root);
 }
 
 uint64_t IpfixDbSerializer::toUint64(const IpfixRecord::Data *data, size_t dataLength, bool &ok) const {

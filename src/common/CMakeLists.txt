@@ -38,6 +38,7 @@ ADD_LIBRARY(common
 
 SUBDIRS(
 	anon
-	ipfixlolib	
+	ipfixlolib
+	jsoncpp
 )
 

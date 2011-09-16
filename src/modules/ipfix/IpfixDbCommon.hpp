@@ -94,6 +94,7 @@ public:
 		ipv4Address,
 		ipv6Address,
 		*/
+		structuredData,
 		unknownType
 	};
 
@@ -140,6 +141,8 @@ protected:
 protected:
 	const IpfixDbColumn &m_type;
 	SerializationType m_serializationType;
+private:
+	std::string encodeStructuredData(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const;
 };
 
 class IpfixDbColumn {

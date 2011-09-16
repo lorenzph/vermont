@@ -113,4 +113,4 @@ ADD_LIBRARY(modules
     ipfix/aggregator/Rule.cpp
 )
 
-
+TARGET_LINK_LIBRARIES(modules jsoncpp)
