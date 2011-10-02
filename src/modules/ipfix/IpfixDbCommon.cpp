@@ -21,7 +21,6 @@
 #if defined(DB_SUPPORT_ENABLED) || defined(PG_SUPPORT_ENABLED)
 
 #include <limits>
-#include <common/jsoncpp/json/json.h>
 
 #include "IpfixDbCommon.hpp"
 
@@ -35,6 +34,10 @@ IpfixDbSerializer::IpfixDbSerializer(const IpfixDbColumn &type, SerializationTyp
 
 }
 
+/**
+  * Serializes the field beginning at \a data returning a serialized string
+  * representation of the field.
+  */
 std::string IpfixDbSerializer::serializeValue(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) {
 	SerializationType type = m_serializationType;
 	size_t dataLength = fieldInfo->type.length;
@@ -89,6 +92,28 @@ std::string IpfixDbSerializer::serializeValue(const IpfixRecord::Data *data, Tem
 }
 
 string IpfixDbSerializer::encodeStructuredData(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const {
+	Json::Value root = encodeField(data, fieldInfo);
+	Json::FastWriter writer;
+
+	return writer.write(root);
+}
+
+Json::Value IpfixDbSerializer::encodeField(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const {
+	if (!fieldInfo->type.isStructuredData()) {
+		size_t dataLength = fieldInfo->type.length;
+		std::string str;
+		if (dataLength <= 8) {
+			ostringstream strbuf;
+			bool ok = false;
+			strbuf << toUint64(data, dataLength, ok);
+			str = strbuf.str();
+		} else {
+			str = std::string((const char *) data, dataLength);
+		}
+
+		return Json::Value(str);
+	}
+
 	Json::Value root;
 
 	root["type"] = fieldInfo->type.id;
@@ -104,11 +129,12 @@ string IpfixDbSerializer::encodeStructuredData(const IpfixRecord::Data *data, Te
 
 		for (uint16_t fieldIndex = 0; fieldIndex < rowInfo->fieldCount; fieldIndex++) {
 			Json::Value field;
-			TemplateInfo::FieldInfo *fieldInfo = &rowInfo->fields[fieldIndex];
+			TemplateInfo::FieldInfo *childFieldInfo = &rowInfo->fields[fieldIndex];
 
-			field["id"] = fieldInfo->type.id;
-			field["enterpriseId"] = fieldInfo->type.enterprise;
-			field["value"] = Json::Value(std::string((const char *) data + fieldInfo->offset, fieldInfo->type.length));
+			field["id"] = childFieldInfo->type.id;
+			field["enterpriseId"] = childFieldInfo->type.enterprise;
+			field["value"] = encodeField(data + (childFieldInfo->offset - fieldInfo->offset),
+										 childFieldInfo);
 
 			fields.append(field);
 		}
@@ -120,9 +146,7 @@ string IpfixDbSerializer::encodeStructuredData(const IpfixRecord::Data *data, Te
 
 	root["rows"] = rowArray;
 
-	Json::FastWriter writer;
-
-	return writer.write(root);
+	return root;
 }
 
 uint64_t IpfixDbSerializer::toUint64(const IpfixRecord::Data *data, size_t dataLength, bool &ok) const {
