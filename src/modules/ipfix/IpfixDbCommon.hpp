@@ -63,6 +63,7 @@
 #define CN_maxPacketGap		"maxPacketGap"
 
 #include "IpfixRecord.hpp"
+#include <common/jsoncpp/json/json.h>
 
 class IpfixDbColumn;
 
@@ -143,6 +144,7 @@ protected:
 	SerializationType m_serializationType;
 private:
 	std::string encodeStructuredData(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const;
+	Json::Value encodeField(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const;
 };
 
 class IpfixDbColumn {
