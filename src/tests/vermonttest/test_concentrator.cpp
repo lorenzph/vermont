@@ -309,7 +309,7 @@ void test_parser_stability() {
 	IpfixParser ipfixParser(&recordSender);
 
 	for (int iteration = 0; iteration < 1000; iteration++) {
-		for (int len = 32; len < 64; len++) {
+		for (uint16_t len = 32; len < 64; len++) {
 			boost::shared_array<uint8_t> message(new uint8_t[len]);
 			for (int i = 0; i < len; i++) message[i]=rand();
 			*((uint16_t*)message.get())=htons(0x000a);

@@ -111,9 +111,10 @@ void IpfixRawdirReader::run() {
 		memcpy(sourceID->exporterAddress.ip, &ip, 4);
 		sourceID->exporterAddress.len = 4;
 
+		uint16_t length = n;
 		for (std::list<IpfixPacketProcessor*>::iterator i = packetProcessors.begin(); i != packetProcessors.end(); ++i) { 
 		msg(MSG_DEBUG, "Data block starts with: %x %x %x %x", data[0], data[1], data[2], data[3]);
-			(*i)->processPacket(data, n, sourceID);
+			(*i)->processPacket(data, length, sourceID);
 		}
 
 		//sleep(1);

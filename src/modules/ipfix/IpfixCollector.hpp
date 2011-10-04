@@ -28,6 +28,7 @@
 
 #include <stdint.h>
 
+class IpfixDecompressor;
 
 /**
  * Represents a collector module
@@ -39,7 +40,8 @@ class IpfixCollector
 	: public Module, public Source<IpfixRecord*>, public Destination<NullEmitable*>, public IpfixRecordSender 
 {
 	public:
-		IpfixCollector(IpfixReceiver* receiver);
+		IpfixCollector(IpfixReceiver* receiver,
+					   const std::string &compressionMethod = "");
 		virtual ~IpfixCollector();
 
 		virtual void performStart();
@@ -59,6 +61,9 @@ class IpfixCollector
 		IpfixReceiver* ipfixReceiver;
 		IpfixPacketProcessor* ipfixPacketProcessor;
 		uint64_t statSentRecords;
+#ifdef WITH_DECOMPRESSION
+		IpfixDecompressor *ipfixPacketDecompressor;
+#endif
 
 };
 

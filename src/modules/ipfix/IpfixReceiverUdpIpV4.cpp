@@ -149,8 +149,9 @@ void IpfixReceiverUdpIpV4::run() {
 			sourceID->receiverPort = receiverPort;
 			sourceID->fileDescriptor = listen_socket;
 			mutex.lock();
-			for (std::list<IpfixPacketProcessor*>::iterator i = packetProcessors.begin(); i != packetProcessors.end(); ++i) { 
-				(*i)->processPacket(data, ret, sourceID);
+			uint16_t length = ret;
+			for (std::list<IpfixPacketProcessor*>::iterator i = packetProcessors.begin(); i != packetProcessors.end(); ++i) {
+				(*i)->processPacket(data, length, sourceID);
 			}
 			mutex.unlock();
 		} else {

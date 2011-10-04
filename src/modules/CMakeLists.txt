@@ -87,6 +87,7 @@ ADD_LIBRARY(modules
     ipfix/IpfixPrinter.cpp
     ipfix/IpfixParser.cpp
     ipfix/IpfixCollector.cpp
+	ipfix/IpfixDecompressor.cpp
     ipfix/IpfixSender.cpp
     ipfix/IpfixRawdirWriter.cpp
     ipfix/TemplateBuffer.cpp
@@ -108,7 +109,20 @@ ADD_LIBRARY(modules
     ipfix/aggregator/IpfixAggregator.cpp
     ipfix/aggregator/PacketAggregator.cpp
     ipfix/aggregator/Rules.cpp
-    ipfix/aggregator/Rule.cpp
+	ipfix/aggregator/Rule.cpp
 )
 
-
+IF (WITH_DECOMPRESSION)
+	ADD_DEFINITIONS(-DWITH_DECOMPRESSION)
+	IF (BZIP2_FOUND)
+		INCLUDE_DIRECTORIES(${BZIP2_INCLUDE_DIR})
+		TARGET_LINK_LIBRARIES(modules ${BZIP2_LIBRARIES})
+		ADD_DEFINITIONS(-DWITH_BZIP2)
+	ENDIF (BZIP2_FOUND)
+	IF (ZLIB_FOUND)
+		INCLUDE_DIRECTORIES(${ZLIB_INCLUDE_DIRS})
+		TARGET_LINK_LIBRARIES(modules ${ZLIB_LIBRARIES})
+		ADD_DEFINITIONS(-DWITH_ZLIB)
+	ENDIF (ZLIB_FOUND)
+	TARGET_LINK_LIBRARIES(modules quicklz)
+ENDIF (WITH_DECOMPRESSION)

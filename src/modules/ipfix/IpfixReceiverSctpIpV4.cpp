@@ -167,8 +167,9 @@ void IpfixReceiverSctpIpV4::run() {
 				sourceID->fileDescriptor = rfd;
 				// send packet to all packet processors
 				mutex.lock();
+				uint16_t length = ret;
 				for (std::list<IpfixPacketProcessor*>::iterator i = packetProcessors.begin(); i != packetProcessors.end(); ++i) { 
-					(*i)->processPacket(data, ret, sourceID);
+					(*i)->processPacket(data, length, sourceID);
 				}
 				mutex.unlock();
 				if (ret == 0) { // this was a shut down (or error)

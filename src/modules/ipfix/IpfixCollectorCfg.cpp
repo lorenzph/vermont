@@ -43,6 +43,8 @@ IpfixCollectorCfg::IpfixCollectorCfg(XMLElement* elem)
 	caPath = getOptional("CApath");
 	// observationDomainId = getInt("observationDomainId", 0);
 	
+        compressionAlgorithm = getOptional("compressionAlgorithm");
+
 	XMLNode::XMLSet<XMLElement*> set = elem->getElementChildren();
 	for (XMLNode::XMLSet<XMLElement*>::iterator it = set.begin();
 	     it != set.end();
@@ -60,7 +62,8 @@ IpfixCollectorCfg::IpfixCollectorCfg(XMLElement* elem)
 		} else if (e->matches("udpTemplateLifetime")) { // already done
 		} else if (e->matches("next")) { // ignore next
 		} else if (e->matches("cert") || e->matches("key") ||
-				e->matches("CAfile") || e->matches("CApath")) {
+                                e->matches("CAfile") || e->matches("CApath") ||
+                           e->matches("compressionMethod")) {
 			// already done!
 		} else {
 			msg(MSG_FATAL, "Unkown collector config statement %s", e->getName().c_str());
@@ -95,7 +98,7 @@ IpfixCollectorCfg* IpfixCollectorCfg::create(XMLElement* elem)
 
 IpfixCollector* IpfixCollectorCfg::createInstance()
 {
-	instance = new IpfixCollector(listener->createIpfixReceiver(certificateChainFile, privateKeyFile, caFile, caPath));
+        instance = new IpfixCollector(listener->createIpfixReceiver(certificateChainFile, privateKeyFile, caFile, caPath), compressionAlgorithm);
 	if(udpTemplateLifetime>=0)
 		instance->setTemplateLifetime((uint16_t)udpTemplateLifetime);
 	return instance;

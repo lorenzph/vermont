@@ -41,3 +41,7 @@ SUBDIRS(
 	ipfixlolib	
 )
 
+IF (WITH_DECOMPRESSION)
+	ADD_LIBRARY(quicklz
+		quicklz/quicklz.c)
+ENDIF (WITH_DECOMPRESSION)

@@ -24,6 +24,7 @@
 
 #include "IpfixReceiver.hpp"
 #include "IpfixParser.hpp"
+#include "IpfixDecompressor.h"
 #include "common/msg.h"
 
 
@@ -32,15 +33,25 @@
  * Creates a new IpfixCollector.
  * Call @c startIpfixCollector() to start receiving and processing messages.
  */
-IpfixCollector::IpfixCollector(IpfixReceiver* receiver)
+IpfixCollector::IpfixCollector(IpfixReceiver* receiver,
+							   const std::string &compressionAlgorithm)
 	: ipfixReceiver(receiver),
-	  statSentRecords(0)
+	  statSentRecords(0),
+	  ipfixPacketDecompressor(NULL)
 {
 	ipfixPacketProcessor = new IpfixParser(this);
 	receiver->setVModule(this);
 	
 	// wire ipfixReceiver with ipfixPacketProcessor
 	list<IpfixPacketProcessor*> pplist;
+#ifdef WITH_DECOMPRESSION
+	if (!compressionAlgorithm.empty()) {
+		ipfixPacketDecompressor =
+				new IpfixDecompressor(compressionAlgorithm);
+		pplist.push_back(ipfixPacketDecompressor);
+	}
+#endif
+
 	pplist.push_back(ipfixPacketProcessor);
 	ipfixReceiver->setPacketProcessors(pplist);
 }
@@ -54,6 +65,10 @@ IpfixCollector::~IpfixCollector()
 	this->shutdown(false);
 	delete ipfixReceiver;
 	delete ipfixPacketProcessor;
+#ifdef WITH_DECOMPRESSION
+	if (ipfixPacketDecompressor)
+		delete ipfixPacketDecompressor;
+#endif
 }
 
 /**

@@ -50,6 +50,9 @@ private:
 	std::string caFile;
 	std::string caPath;
 
+	/** Compression parameters */
+	std::string compressionAlgorithm;
+
 	
         IpfixCollector* ipfixCollector;
 

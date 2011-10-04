@@ -829,7 +829,7 @@ int IpfixParser::processIpfixPacket(boost::shared_array<uint8_t> message, uint16
  * Process new Message
  * @return 0 on success
  */
-int IpfixParser::processPacket(boost::shared_array<uint8_t> message, uint16_t length, boost::shared_ptr<IpfixRecord::SourceID> sourceId)
+int IpfixParser::processPacket(boost::shared_array<uint8_t> &message, uint16_t &length, boost::shared_ptr<IpfixRecord::SourceID> sourceId)
 {
 	pthread_mutex_lock(&mutex);
 	if (length == 0) {
