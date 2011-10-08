@@ -98,6 +98,8 @@ ADD_LIBRARY(modules
     ipfix/IpfixSampler.cpp
     ipfix/IpfixPayloadWriter.cpp
     ipfix/IpfixRecordAnonymizer.cpp
+	ipfix/IpfixRecordFilter.cpp
+	ipfix/IpfixRecordFilterCfg.cpp
     ipfix/NetflowV9Converter.cpp
     ipfix/aggregator/PacketAggregatorCfg.cpp
     ipfix/aggregator/AggregatorBaseCfg.cpp

@@ -48,6 +48,7 @@
 #include "modules/ipfix/NetflowV9ConverterCfg.hpp"
 #include "modules/ipfix/aggregator/IpfixAggregatorCfg.h"
 #include "modules/ipfix/aggregator/PacketAggregatorCfg.h"
+#include "modules/ipfix/IpfixRecordFilterCfg.h"
 #include "modules/SensorManagerCfg.h"
 #include "modules/analysis/TRWPortscanDetectorCfg.h"
 #include "modules/analysis/RBSWormDetectorCfg.h"
@@ -96,6 +97,7 @@ Cfg* ConfigManager::configModules[] = {
 	new P2PDetectorCfg(NULL),
 	new HostStatisticsCfg(NULL),
 	new IpfixCsExporterCfg(NULL),
+	new IpfixRecordFilterCfg(NULL),
 #ifdef DB_SUPPORT_ENABLED
 	new IpfixDbReaderCfg(NULL),
 	new IpfixDbWriterCfg(NULL),
