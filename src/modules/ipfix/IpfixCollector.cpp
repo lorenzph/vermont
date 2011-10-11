@@ -36,8 +36,7 @@
 IpfixCollector::IpfixCollector(IpfixReceiver* receiver,
 							   const std::string &compressionAlgorithm)
 	: ipfixReceiver(receiver),
-	  statSentRecords(0),
-	  ipfixPacketDecompressor(NULL)
+	  statSentRecords(0)
 {
 	ipfixPacketProcessor = new IpfixParser(this);
 	receiver->setVModule(this);
@@ -45,6 +44,8 @@ IpfixCollector::IpfixCollector(IpfixReceiver* receiver,
 	// wire ipfixReceiver with ipfixPacketProcessor
 	list<IpfixPacketProcessor*> pplist;
 #ifdef WITH_DECOMPRESSION
+	ipfixPacketDecompressor = NULL;
+
 	if (!compressionAlgorithm.empty()) {
 		ipfixPacketDecompressor =
 				new IpfixDecompressor(compressionAlgorithm);
