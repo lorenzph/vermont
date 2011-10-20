@@ -1,0 +1,113 @@
+<ipfixConfig>
+	<ipfixCollector id="1">
+		<listener>
+			<transportProtocol>SCTP</transportProtocol>
+			<port>4433</port>
+		</listener>
+		<next>2</next>
+		<next>3</next>
+		<next>4</next>
+		<next>5</next>
+	</ipfixCollector>
+	<ipfixPrinter id="2">
+	</ipfixPrinter>
+	<ipfixRecordFilter id="3">
+		<!-- OLSR Information -->
+		<templateId>888</templateId>
+		<next>7</next>
+	</ipfixRecordFilter>
+	<ipfixRecordFilter id="4">
+		<!-- Flow information -->
+		<templateId>892</templateId>
+		<next>6</next>
+	</ipfixRecordFilter>
+	<ipfixRecordFilter id="5">
+		<!-- Capture statistics -->
+		<templateId>893</templateId>
+		<next>8</next>
+	</ipfixRecordFilter>
+
+	<ipfixDbWriter id="6">
+		<!-- Flow database -->
+		<host>127.0.0.1</host>
+		<port>3306</port>
+		<dbname>flows_vermont</dbname>
+		<username>root</username>
+		<password></password>
+		<bufferrecords>5</bufferrecords>
+		<columns>
+			<name>dstIP</name>
+			<name>srcIP</name>
+			<name>srcPort</name>
+			<name>dstPort</name>
+			<name>proto</name>
+			<name>dstTos</name>
+			<name>bytes</name>
+			<name>pkts</name>
+			<name>firstSwitched</name>
+			<name>lastSwitched</name>
+			<name>firstSwitchedMillis</name>
+			<name>lastSwitchedMillis</name>
+			<name>exporterID</name>
+		</columns>
+	</ipfixDbWriter>
+	<ipfixDbWriter id="7">
+		<!-- OLSR database -->
+		<host>127.0.0.1</host>
+		<port>3306</port>
+		<dbname>olsr_vermont</dbname>
+		<username>root</username>
+		<password></password>
+		<bufferrecords>5</bufferrecords>
+		<columns>
+			<name>exporterID</name>
+			<complextype>
+				<name>sequence</name>
+				<type>INTEGER UNSIGNED</type>
+				<informationelement enterpriseId="8889">1</informationelement>
+			</complextype>
+			<complextype>
+				<name>content</name>
+				<type>TEXT</type>
+				<informationelement>292</informationelement>
+			</complextype>
+		</columns>
+	</ipfixDbWriter>
+	<ipfixDbWriter id="8">
+		<host>127.0.0.1</host>
+		<port>3306</port>
+		<dbname>capture_statistics_vermont</dbname>
+		<username>root</username>
+		<password></password>
+		<bufferrecords>5</bufferrecords>
+		<columns>
+			<name>exporterID</name>
+			<complextype>
+				<name>interfaceType</name>
+				<type>INTEGER UNSIGNED</type>
+				<informationelement enterpriseId="8889">11</informationelement>
+			</complextype>
+			<complextype>
+				<name>interfaceIndex</name>
+				<type>INTEGER UNSIGNED</type>
+				<informationelement enterpriseId="8889">12</informationelement>
+			</complextype>
+			<complextype>
+				<name>totalPackets</name>
+				<type>INTEGER UNSIGNED</type>
+				<informationelement enterpriseId="8889">13</informationelement>
+			</complextype>
+			<complextype>
+				<name>droppedPackets</name>
+				<type>INTEGER UNSIGNED</type>
+				<informationelement enterpriseId="8889">14</informationelement>
+			</complextype>
+			<complextype>
+				<name>timestamp</name>
+				<type>INTEGER UNSIGNED</type>
+				<informationelement enterpriseId="8889">15</informationelement>
+			</complextype>
+		</columns>
+	</ipfixDbWriter>
+</ipfixConfig>
+
