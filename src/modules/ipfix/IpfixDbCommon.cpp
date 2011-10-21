@@ -114,39 +114,128 @@ Json::Value IpfixDbSerializer::encodeField(const IpfixRecord::Data *data, Templa
 		return Json::Value(str);
 	}
 
-	Json::Value root;
+	switch (fieldInfo->type.id) {
+	case IPFIX_TYPEID_basicList:
+		return encodeBasicList(data, fieldInfo);
+	case IPFIX_TYPEID_subTemplateList:
+		return encodeSubTemplateList(data, fieldInfo);
+	case IPFIX_TYPEID_subTemplateMultiList:
+		return encodeSubTemplateMultiList(data, fieldInfo);
+	default:
+		return Json::Value();
+	}
+}
 
-	root["type"] = fieldInfo->type.id;
+Json::Value IpfixDbSerializer::encodeBasicList(const IpfixRecord::Data *data,
+											   TemplateInfo::FieldInfo *fieldInfo) const {
+	Json::Value encoded;
+
+	encoded["type"] = fieldInfo->type.id;
 
 	Json::Value rowArray;
-
 	for (uint16_t rowIndex = 0; rowIndex < fieldInfo->rowCount; rowIndex++) {
 		Json::Value row;
-		Json::Value fields;
 		TemplateInfo::StructuredDataRow *rowInfo = &fieldInfo->rows[rowIndex];
 
-		row["templateId"] = rowInfo->templateId;
-
-		for (uint16_t fieldIndex = 0; fieldIndex < rowInfo->fieldCount; fieldIndex++) {
-			Json::Value field;
-			TemplateInfo::FieldInfo *childFieldInfo = &rowInfo->fields[fieldIndex];
-
-			field["id"] = childFieldInfo->type.id;
-			field["enterpriseId"] = childFieldInfo->type.enterprise;
-			field["value"] = encodeField(data + (childFieldInfo->offset - fieldInfo->offset),
-										 childFieldInfo);
-
-			fields.append(field);
+		if (rowIndex == 0) {
+			encoded["fields"] = Json::Value();
 		}
 
-		row["fields"] = fields;
+		for (uint16_t fieldIndex = 0; fieldIndex < rowInfo->fieldCount; fieldIndex++) {
+			TemplateInfo::FieldInfo *childFieldInfo = &rowInfo->fields[fieldIndex];
+
+			row.append(encodeField(data + (childFieldInfo->offset - fieldInfo->offset),
+								   childFieldInfo));
+
+			if (rowIndex == 0) {
+				Json::Value fieldInfo;
+				fieldInfo["id"] = childFieldInfo->type.id;
+				if (childFieldInfo->type.enterprise)
+					fieldInfo["enterpriseId"] = childFieldInfo->type.enterprise;
+				encoded["fields"].append(fieldInfo);
+			}
+		}
 
 		rowArray.append(row);
 	}
 
-	root["rows"] = rowArray;
+	encoded["rows"] = rowArray;
 
-	return root;
+	return encoded;
+}
+
+Json::Value IpfixDbSerializer::encodeSubTemplateList(const IpfixRecord::Data *data,
+													 TemplateInfo::FieldInfo *fieldInfo) const {
+	Json::Value encoded;
+
+	encoded["type"] = fieldInfo->type.id;
+
+	Json::Value rowArray;
+	for (uint16_t rowIndex = 0; rowIndex < fieldInfo->rowCount; rowIndex++) {
+		Json::Value row;
+		TemplateInfo::StructuredDataRow *rowInfo = &fieldInfo->rows[rowIndex];
+
+		if (rowIndex == 0) {
+			encoded["templateId"] = rowInfo->templateId;
+		}
+
+		for (uint16_t fieldIndex = 0; fieldIndex < rowInfo->fieldCount; fieldIndex++) {
+			TemplateInfo::FieldInfo *childFieldInfo = &rowInfo->fields[fieldIndex];
+
+			row.append(encodeField(data + (childFieldInfo->offset - fieldInfo->offset),
+								   childFieldInfo));
+		}
+
+		rowArray.append(row);
+	}
+
+	encoded["rows"] = rowArray;
+
+	return encoded;
+}
+
+Json::Value IpfixDbSerializer::encodeSubTemplateMultiList(const IpfixRecord::Data *data,
+														  TemplateInfo::FieldInfo *fieldInfo) const {
+	Json::Value encoded;
+
+	encoded["type"] = fieldInfo->type.id;
+	encoded["rowSet"] = Json::Value();
+
+	Json::Value rowSet;
+	int lastTemplateId = -1;
+
+	for (uint16_t rowIndex = 0; rowIndex < fieldInfo->rowCount; rowIndex++) {
+		Json::Value row;
+		TemplateInfo::StructuredDataRow *rowInfo = &fieldInfo->rows[rowIndex];
+
+		if (rowInfo->templateId != lastTemplateId) {
+			if (lastTemplateId != -1)
+				encoded["rowSet"].append(rowSet);
+
+			rowSet = Json::Value();
+			rowSet["templateId"] = rowInfo->templateId;
+			rowSet["rows"] = Json::Value();
+
+			lastTemplateId = rowInfo->templateId;
+		}
+
+		if (rowIndex == 0) {
+			encoded["templateId"] = rowInfo->templateId;
+		}
+
+		for (uint16_t fieldIndex = 0; fieldIndex < rowInfo->fieldCount; fieldIndex++) {
+			TemplateInfo::FieldInfo *childFieldInfo = &rowInfo->fields[fieldIndex];
+
+			row.append(encodeField(data + (childFieldInfo->offset - fieldInfo->offset),
+								   childFieldInfo));
+		}
+
+		rowSet["rows"].append(row);
+	}
+
+	encoded["rowSet"].append(rowSet);
+
+	return encoded;
 }
 
 uint64_t IpfixDbSerializer::toUint64(const IpfixRecord::Data *data, size_t dataLength, bool &ok) const {

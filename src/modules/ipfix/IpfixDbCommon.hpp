@@ -145,6 +145,10 @@ protected:
 private:
 	std::string encodeStructuredData(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const;
 	Json::Value encodeField(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const;
+	Json::Value encodeBasicList(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const;
+	Json::Value encodeSubTemplateList(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const;
+	Json::Value encodeSubTemplateMultiList(const IpfixRecord::Data *data, TemplateInfo::FieldInfo *fieldInfo) const;
+
 };
 
 class IpfixDbColumn {
