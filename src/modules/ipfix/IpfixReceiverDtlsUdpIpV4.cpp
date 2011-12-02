@@ -417,9 +417,10 @@ int IpfixReceiverDtlsUdpIpV4::DtlsConnection::consumeDatagram(
     }
     parent.statReceivedPackets++;
     parent.mutex.lock();
+	uint16_t readlen = ret;
     for (std::list<IpfixPacketProcessor*>::iterator i = parent.packetProcessors.begin();
 	    i != parent.packetProcessors.end(); ++i) { 
-	(*i)->processPacket(data, ret, sourceID);
+	(*i)->processPacket(data, readlen, sourceID);
     }
     parent.mutex.unlock();
     return 1;
