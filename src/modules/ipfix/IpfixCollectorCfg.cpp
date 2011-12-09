@@ -63,7 +63,7 @@ IpfixCollectorCfg::IpfixCollectorCfg(XMLElement* elem)
 		} else if (e->matches("next")) { // ignore next
 		} else if (e->matches("cert") || e->matches("key") ||
                                 e->matches("CAfile") || e->matches("CApath") ||
-                           e->matches("compressionMethod")) {
+                           e->matches("compressionAlgorithm")) {
 			// already done!
 		} else {
 			msg(MSG_FATAL, "Unkown collector config statement %s", e->getName().c_str());
