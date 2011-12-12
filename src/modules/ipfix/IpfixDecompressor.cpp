@@ -119,7 +119,7 @@ QuickLZDecompressor::QuickLZDecompressor() {
 	// Sanity checks to ensure that QuickLZ has been compiled with the correct
 	// defines.
 
-	ASSERT(qlz_get_setting(0) == 3, "Unexpected QLZ_COMPRESSION_LEVEL");
+        ASSERT(qlz_get_setting(0) == 1, "Unexpected QLZ_COMPRESSION_LEVEL");
 	ASSERT(qlz_get_setting(3) == MAX_MSG_LEN, "Unexpected QLZ_STREAMING_BUFFER");
 	ASSERT(qlz_get_setting(6) == 1, "Unexpected QLZ_MEMORY_SAFE");
 }

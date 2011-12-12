@@ -22,7 +22,7 @@
 
 	// 1 gives fastest compression speed. 3 gives fastest decompression speed and best
 	// compression ratio. 
-	#define QLZ_COMPRESSION_LEVEL 3
+        #define QLZ_COMPRESSION_LEVEL 1
 	//#define QLZ_COMPRESSION_LEVEL 2
 	//#define QLZ_COMPRESSION_LEVEL 3
 
