@@ -20,7 +20,7 @@ int DeflateDecompressor::decompress(const boost::shared_array<uint8_t> source,
 	strm.zalloc = Z_NULL;
 	strm.zfree = Z_NULL;
 	strm.opaque = Z_NULL;
-	ret = inflateInit(&strm);
+        ret = inflateInit2(&strm, -15);
 
 	if (ret != Z_OK)
 		return -1;

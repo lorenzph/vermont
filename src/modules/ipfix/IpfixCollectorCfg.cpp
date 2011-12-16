@@ -43,7 +43,7 @@ IpfixCollectorCfg::IpfixCollectorCfg(XMLElement* elem)
 	caPath = getOptional("CApath");
 	// observationDomainId = getInt("observationDomainId", 0);
 	
-        compressionAlgorithm = getOptional("compressionAlgorithm");
+	compressionAlgorithm = getOptional("compressionAlgorithm");
 
 	XMLNode::XMLSet<XMLElement*> set = elem->getElementChildren();
 	for (XMLNode::XMLSet<XMLElement*>::iterator it = set.begin();
@@ -63,7 +63,7 @@ IpfixCollectorCfg::IpfixCollectorCfg(XMLElement* elem)
 		} else if (e->matches("next")) { // ignore next
 		} else if (e->matches("cert") || e->matches("key") ||
                                 e->matches("CAfile") || e->matches("CApath") ||
-                           e->matches("compressionMethod")) {
+						   e->matches("compressionAlgorithm")) {
 			// already done!
 		} else {
 			msg(MSG_FATAL, "Unkown collector config statement %s", e->getName().c_str());
